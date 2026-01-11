@@ -45,23 +45,14 @@
             input[type="date"] { border-bottom: none !important; }
         }
         
-        /* Date Picker Customization - Fixed Style */
-        input[type="date"] {
-            position: relative;
-        }
+        /* Date Picker Customization */
+        input[type="date"] { position: relative; }
         input[type="date"]::-webkit-calendar-picker-indicator {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            opacity: 0;
-            cursor: pointer;
-            padding: 0;
-            margin: 0;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0; cursor: pointer; padding: 0; margin: 0;
         }
         
-        /* Scrollbar styling */
+        /* Scrollbar */
         ::-webkit-scrollbar { height: 8px; width: 8px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -74,12 +65,12 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { Printer, FileText, Edit3, Image as ImageIcon, Clock, PenTool, Video, PlayCircle, Undo, Redo, Calendar as CalendarIcon, Users, MapPin, Briefcase, ChevronDown, MonitorPlay, Wifi, WifiOff, HardDrive, Settings, X, Save, Trash2, AlertCircle, Code, List, HelpCircle, RefreshCw, Link as LinkIcon, Check } from 'lucide-react';
+        import { Printer, FileText, Edit3, Image as ImageIcon, Clock, PenTool, Video, PlayCircle, Undo, Redo, Calendar as CalendarIcon, Users, MapPin, Briefcase, ChevronDown, MonitorPlay, Wifi, WifiOff, HardDrive, Settings, X, Save, Trash2, AlertCircle, Code, List, HelpCircle, RefreshCw, Link as LinkIcon, Check, ExternalLink } from 'lucide-react';
         
         // Firebase Imports
         import { initializeApp, getApps } from "firebase/app";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
-        import { getFirestore, doc, setDoc, onSnapshot, collection } from "firebase/firestore";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, initializeFirestore } from "firebase/firestore";
 
         // --- Firebase Initialization Logic ---
         let app, auth, db;
@@ -123,6 +114,7 @@
                     app = getApps()[0];
                 }
                 auth = getAuth(app);
+                // Firestore初期化時に設定を追加（もし必要なら）
                 db = getFirestore(app);
                 console.log("Firebase initialized successfully with:", firebaseConfig.projectId);
             } catch (e) {
@@ -132,22 +124,18 @@
             }
         }
 
-        // URLパラメータまたはハッシュからプロジェクトIDを取得 (デフォルトは 'demo')
-        // URLがシンプルになるよう、ハッシュ(#)を優先します
+        // URLパラメータまたはハッシュからプロジェクトIDを取得
         const getProjectIdFromUrl = () => {
-            // 1. ハッシュ(#)をチェック
-            const hash = window.location.hash.substring(1); // #を除去
+            const hash = window.location.hash.substring(1); 
             if (hash) return decodeURIComponent(hash);
             
-            // 2. クエリパラメータ(?id=)をチェック (互換性のため)
             const params = new URLSearchParams(window.location.search);
             if (params.get('id')) return params.get('id');
 
-            // 3. デフォルト
             return 'demo';
         };
 
-        // --- Data Templates (省略なし) ---
+        // --- Data Templates ---
         const patternA_Data = {
             type: 'storyboard',
             header: { title: "『入院することになって…』(A案)", page: "1 / 1" },
@@ -331,13 +319,16 @@
                                     <AlertCircle className="w-5 h-5 flex-shrink-0" />
                                     <div>
                                         <p className="font-bold">エラーが発生しました</p>
-                                        <p className="text-xs break-all">{error}</p>
-                                        {(error.includes("auth") || error.includes("configuration")) && (
-                                            <p className="mt-2 text-xs text-rose-700 font-bold bg-white p-2 rounded border border-rose-100">
-                                                【対処法】<br/>
-                                                Firebase Consoleで<br/>
-                                                [Authentication] &gt; [Sign-in method] &gt; [匿名 (Anonymous)] を「有効」にしてください。
-                                            </p>
+                                        <p className="text-xs break-all">{typeof error === 'string' ? error : JSON.stringify(error)}</p>
+                                        {(typeof error === 'string' && (error.includes("auth") || error.includes("configuration") || error.includes("unavailable"))) && (
+                                            <div className="mt-2 text-xs text-rose-700 font-bold bg-white p-2 rounded border border-rose-100">
+                                                <p class="mb-1">【考えられる原因と対処】</p>
+                                                <ul class="list-disc pl-4 space-y-1">
+                                                    {error.includes("unavailable") && <li><strong>Firestore Databaseが作成されていません。</strong> Firebase Consoleの[Build] &gt; [Firestore Database]からデータベースを作成してください（モードは「テストモード」を推奨）。</li>}
+                                                    {error.includes("auth") && <li><strong>匿名認証が無効です。</strong> Firebase Consoleの[Authentication] &gt; [Sign-in method]で「匿名」を有効にしてください。</li>}
+                                                    <li>ネットワーク接続を確認してください。</li>
+                                                </ul>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -608,7 +599,7 @@
                 return onAuthStateChanged(auth, (u) => {
                     setUser(u);
                     if (!u && !globalInitError) {
-                        // 接続試行中かもしれないので、即時エラーにはしない
+                        // 接続試行中
                     }
                 });
             }, []);
@@ -616,7 +607,6 @@
             // Firestore Sync (Listen)
             useEffect(() => {
                 if (!user || !db) return;
-                // URLパラメータのIDを使ってドキュメントを分ける
                 const docRef = doc(collection(db, 'projects'), projectId);
                 
                 const unsubscribe = onSnapshot(docRef, (docSnap) => {
@@ -630,12 +620,17 @@
                             return newHist;
                         });
                     } else {
-                        // ドキュメントが存在しない場合は初期データを保存
                         saveToFirestore(initialProjectData);
                     }
                 }, (error) => {
-                    console.log("Sync error:", error);
-                    setSyncError("同期エラー: 権限またはNWの問題");
+                    console.error("Sync error:", error);
+                    if (error.code === 'unavailable') {
+                        setSyncError("接続エラー: Firestoreに接続できません。DBが作成されているか確認してください。");
+                    } else if (error.code === 'permission-denied') {
+                        setSyncError("権限エラー: Firestoreのルールを確認してください。");
+                    } else {
+                        setSyncError(`同期エラー: ${error.message}`);
+                    }
                 });
                 return () => unsubscribe();
             }, [user, projectId]); // projectIdが変わったら再接続
@@ -804,7 +799,7 @@
                     </div>
                     
                     <div className="mt-8 text-center text-slate-400 text-sm print:hidden pb-12">
-                        <p>動画制作マネージャー v15.0 (Firebase Sync Enabled)</p>
+                        <p>動画制作マネージャー v17.0 (Firebase Sync Enabled)</p>
                     </div>
 
                     <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} initialError={globalInitError || syncError} />
