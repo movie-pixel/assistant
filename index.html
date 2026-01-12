@@ -44,7 +44,6 @@
             }
             #root { zoom: 0.9; }
 
-            /* 印刷時に隠す要素 */
             .print\:hidden, 
             .no-print, 
             button:not(.print\:show) { 
@@ -74,23 +73,17 @@
             textarea::placeholder { color: transparent; }
             input[type="date"] { border-bottom: none !important; }
 
-            /* 画像エリアの点線枠などを消す */
-            .image-upload-area {
-                display: none !important;
-            }
-            
+            .image-upload-area { display: none !important; }
             .print\:grid-cols-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
             .break-inside-avoid { page-break-inside: avoid; }
         }
         
-        /* Date Picker Customization */
         input[type="date"] { position: relative; }
         input[type="date"]::-webkit-calendar-picker-indicator {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             opacity: 0; cursor: pointer; padding: 0; margin: 0;
         }
         
-        /* Scrollbar */
         ::-webkit-scrollbar { height: 8px; width: 8px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -103,19 +96,16 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { Printer, FileText, Edit3, Image as ImageIcon, Clock, PenTool, Video, PlayCircle, Undo, Redo, Calendar as CalendarIcon, Users, MapPin, Briefcase, ChevronDown, MonitorPlay, Wifi, WifiOff, HardDrive, Settings, X, Save, Trash2, AlertCircle, Code, List, HelpCircle, RefreshCw, Link as LinkIcon, Check, ExternalLink, Plus, XCircle, Mic, Upload } from 'lucide-react';
+        import { Printer, FileText, Edit3, Image as ImageIcon, Clock, PenTool, Video, PlayCircle, Undo, Redo, Calendar as CalendarIcon, Users, MapPin, Briefcase, ChevronDown, MonitorPlay, Wifi, WifiOff, HardDrive, Settings, X, Save, Trash2, AlertCircle, Code, List, HelpCircle, RefreshCw, Link as LinkIcon, Check, ExternalLink, Plus, XCircle, Mic, Upload, Loader2, ArrowUpCircle } from 'lucide-react';
         
-        // Firebase Imports
         import { initializeApp, getApps } from "firebase/app";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
         import { getFirestore, doc, setDoc, onSnapshot, collection } from "firebase/firestore";
 
-        // --- Firebase Initialization Logic ---
         let app, auth, db;
         const appId = 'storyboard-project-v1'; 
         let globalInitError = null;
 
-        // デフォルト設定
         const defaultFirebaseConfig = {
             apiKey: "AIzaSyDnJf6vHEpdkjhjtnkLxzJaT4EGJgAw1lI",
             authDomain: "ekonte-a4b51.firebaseapp.com",
@@ -125,7 +115,6 @@
             appId: "1:402726001930:web:65f70eb92369726c5ceef3"
         };
 
-        // 1. 設定の決定 
         const savedConfigStr = localStorage.getItem('firebase_config');
         let firebaseConfig = defaultFirebaseConfig; 
 
@@ -142,7 +131,6 @@
             }
         }
 
-        // 2. Initialize Firebase
         if (firebaseConfig) {
             try {
                 if (!getApps().length) {
@@ -151,7 +139,6 @@
                     app = getApps()[0];
                 }
                 auth = getAuth(app);
-                // Firestore初期化時に設定を追加
                 db = getFirestore(app);
                 console.log("Firebase initialized successfully with:", firebaseConfig.projectId);
             } catch (e) {
@@ -161,7 +148,6 @@
             }
         }
 
-        // URLパラメータまたはハッシュからプロジェクトIDを取得
         const getProjectIdFromUrl = () => {
             const hash = window.location.hash.substring(1); 
             if (hash) return decodeURIComponent(hash);
@@ -170,7 +156,6 @@
             return 'demo';
         };
 
-        // 画像圧縮関数（さらに軽量化設定に変更）
         const compressImage = (file, maxWidth = 500, quality = 0.6) => {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -198,10 +183,19 @@
             });
         };
 
+        const checkDataSize = (data) => {
+            const jsonString = JSON.stringify(data);
+            return new TextEncoder().encode(jsonString).length;
+        };
+
         // --- Data Templates ---
         const migrateCutData = (cut) => {
-            if (!cut.images && cut.image) return { ...cut, images: [cut.image] };
-            if (!cut.images) return { ...cut, images: [] };
+            if (!cut.images && cut.image) {
+                return { ...cut, images: [cut.image] };
+            }
+            if (!cut.images) {
+                return { ...cut, images: [] };
+            }
             return cut;
         };
 
@@ -248,31 +242,77 @@
                 { time: "17:30～18:30", scene: "-", location: "-", action: "完全撤収", cast: "全スタッフ", notes: "原状回復確認" },
             ]
         };
+
+        const initialInterviewData = {
+            sections: [
+                {
+                    category: "働き方を知りたい",
+                    items: [
+                        {
+                            title: "インタビュー①｜スタッフの1日",
+                            qa: [
+                                { q: "Q1. 普段の1日の流れを教えてください。", a: "【回答例】\n\n出社したらまず開店準備とメールの確認をして、朝礼で情報共有をします。その後はお客様対応を中心に、合間で事務作業も行います。" },
+                                { q: "Q2. 出社して最初に行うことは何ですか？", a: "【回答例】\n\n店内の準備と、その日の予約や連絡事項のチェックですね。" },
+                                { q: "Q3. お客様対応以外には、どんな業務がありますか？", a: "【回答例】\n\n相談内容の履歴入力や、満期のチェック、必要に応じたフォローの連絡などです。" },
+                                { q: "Q4. 仕事で大切にしていることは何ですか？", a: "【回答例】\n\nお客様が安心して話せるように、まずしっかり話を聞くことです。" },
+                                { q: "Q5. 1日を終えて達成感を感じるのはどんな時ですか？", a: "【回答例】\n\n「来てよかった」と言っていただけた時ですね。" }
+                            ]
+                        },
+                        {
+                            title: "インタビュー②｜働く店舗",
+                            qa: [
+                                { q: "Q1. この店舗の特徴を教えてください。", a: "【回答例】\n\n地域のお客様が多く、リピーターの方が多い店舗です。" },
+                                { q: "Q2. どんなお客様が来られますか？", a: "【回答例】\n\nご家族連れや、ご年配の方の相談が多いですね。" },
+                                { q: "Q3. 勤務地や転勤について教えてください。", a: "【回答例】\n\nエリア限定で働けるので、基本的に転勤はありません。" },
+                                { q: "Q4. 店舗の雰囲気はどんな感じですか？", a: "【回答例】\n\n落ち着いていて、相談しやすい雰囲気だと思います。" },
+                                { q: "Q5. 働きやすさを感じる点は？", a: "【回答例】\n\n困った時にすぐ相談できるところです。" }
+                            ]
+                        }
+                    ]
+                },
+                // ... 他のインタビューデータ ...
+                { category: "キャリアアップを知りたい", items: [{ title: "インタビュー③｜入社後研修・キャリアアップ", qa: [{ q: "Q1. 入社後はどんな研修から始まりますか？", a: "【回答例】\n\n基礎知識から学べる研修からスタートします。" }, { q: "Q2. 未経験でも本当に大丈夫でしたか？", a: "【回答例】\n\n私自身も未経験でしたが、問題ありませんでした。" }, { q: "Q3. 研修ではどんなことを学びますか？", a: "【回答例】\n\n知識だけでなく、お客様との向き合い方も学びます。" }, { q: "Q4. 成長や評価はどのように決まりますか？", a: "【回答例】\n\nできることが増えると、評価や昇給につながります。" }, { q: "Q5. 将来のキャリアにはどんな選択肢がありますか？", a: "【回答例】\n\nリーダーや育成側に進む道もあります。" }] }] },
+                { category: "社員を知りたい", items: [{ title: "インタビュー④｜社員A（育休・復帰）", qa: [{ q: "Q1. 今はどんな働き方をしていますか？", a: "【回答例】\n\n現在は時短勤務で働いています。" }, { q: "Q2. 育休前に不安だったことは何ですか？", a: "【回答例】\n\n仕事と育児の両立が一番不安でした。" }, { q: "Q3. 実際に復帰してみてどうでしたか？", a: "【回答例】\n\n周囲のサポートがあって、安心して復帰できました。" }, { q: "Q4. 働き続けられている理由は何ですか？", a: "【回答例】\n\n自分の状況に合わせて働ける環境があるからです。" }, { q: "Q5. 同じ立場の方に伝えたいことは？", a: "【回答例】\n\n無理せず続けられる職場だと思います。" }] }, { title: "インタビュー⑤｜社員B（新卒→リーダー）", qa: [{ q: "Q1. 新卒でこの会社を選んだ理由は？", a: "【回答例】\n\n人と長く関われる仕事だと思ったからです。" }, { q: "Q2. 入社当初、不安だったことはありますか？", a: "【回答例】\n\n知識面の不安はありました。" }, { q: "Q3. 成長を実感したタイミングは？", a: "【回答例】\n\n一人でお客様対応ができるようになった時です。" }, { q: "Q4. リーダーになって変わったことは？", a: "【回答例】\n\n周りを見て動く意識が強くなりました。" }, { q: "Q5. これから入社する方へ一言お願いします。", a: "【回答例】\n\n未経験でも安心して挑戦してほしいです。" }] }, { title: "インタビュー⑥｜社員C（保険会社から転職）", qa: [{ q: "Q1. 前職ではどんな仕事をしていましたか？", a: "【回答例】\n\n保険会社で営業の仕事をしていました。" }, { q: "Q2. 転職を考えたきっかけは？", a: "【回答例】\n\nもっとお客様に寄り添いたいと思ったからです。" }, { q: "Q3. 今の仕事で一番違うと感じる点は？", a: "【回答例】\n\n売るより、相談に乗る時間が長いところです。" }, { q: "Q4. やりがいはどう変わりましたか？", a: "【回答例】\n\n感謝の言葉を直接いただけるようになりました。" }, { q: "Q5. 転職を迷っている方へ一言。", a: "【回答例】\n\n保険の仕事の見方が変わると思います。" }] }] },
+                { category: "会社を知りたい", items: [{ title: "インタビュー⑦｜会社概要", qa: [{ q: "Q1. どんな会社ですか？", a: "【回答例】\n\n保険のサービスショップを運営している会社です。" }, { q: "Q2. いつ創業した会社ですか？", a: "【回答例】\n\n1998年に創業しました。" }, { q: "Q3. 他社との違いは何ですか？", a: "【回答例】\n\n売ることより、支えることを大切にしています。" }] }, { title: "インタビュー⑧｜事業内容", qa: [{ q: "Q1. どんなサービスを提供していますか？", a: "【回答例】\n\n相談や給付手続き、見直しなどを行っています。" }, { q: "Q2. お客様とはどんな関係性ですか？", a: "【回答例】\n\n長く付き合っていく関係です。" }, { q: "Q3. 仕事の特徴を教えてください？", a: "【回答例】\n\n困った時に頼ってもらえる仕事です。" }] }, { title: "インタビュー⑨｜創業のはなし", qa: [{ q: "Q1. 創業のきっかけは何だったのですか？", a: "【回答例】\n\n保険で困った時に相談できる場所を作りたかったからです。" }, { q: "Q2. 当時、大変だったことは？", a: "【回答例】\n\n前例がなく、すべて手探りでした。" }, { q: "Q3. 今につながっている想いは？", a: "【回答例】\n\nお客様第一という考え方です。" }] }, { title: "インタビュー⑩｜目指していること", qa: [{ q: "Q1. 今後どんな会社を目指していますか？", a: "【回答例】\n\nかかりつけの保険サービスを広げていきたいです。" }, { q: "Q2. 社員にはどんな働き方をしてほしいですか？", a: "【回答例】\n\n誇りを持って働いてほしいです。" }] }, { title: "インタビュー⑪｜募集要項（まとめ）", qa: [{ q: "Q1. 今回募集している職種を教えてください。", a: "【回答例】\n\n保険サービススタッフです。" }, { q: "Q2. どんな方に向いていますか？", a: "【回答例】\n\n人の話を聞くのが好きな方です。" }, { q: "Q3. 未経験でも応募できますか？", a: "【回答例】\n\n研修があるので問題ありません。" }, { q: "Q4. 応募を迷っている方へ一言。", a: "【回答例】\n\nまずは気軽に話を聞きに来てほしいです。" }] }] }
+            ]
+        };
+
         const initialProjectData = {
             common: { clientName: "株式会社〇〇", projectName: "2026年 採用動画制作", date: "2026-01-11" },
             patternA: patternA_Data,
             patternB: normalizeData(patternB_Data),
             patternC: patternC_Data,
-            callSheet: initialCallSheet
+            callSheet: initialCallSheet,
+            interview: initialInterviewData
         };
 
         // --- Components ---
+
         const AutoResizeTextarea = ({ value, onChange, onBlur, className, placeholder, rows = 1, style }) => {
             const textareaRef = useRef(null);
+            
             const adjustHeight = () => {
                 if (textareaRef.current) {
                     textareaRef.current.style.height = "auto";
                     textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
                 }
             };
+
             useLayoutEffect(() => { adjustHeight(); }, [value]);
+            
             useEffect(() => {
+                const timer = setTimeout(adjustHeight, 100);
                 window.addEventListener('resize', adjustHeight);
-                return () => window.removeEventListener('resize', adjustHeight);
+                return () => {
+                    clearTimeout(timer);
+                    window.removeEventListener('resize', adjustHeight);
+                };
             }, []);
+
             return <textarea ref={textareaRef} className={`${className} overflow-hidden`} value={value} onChange={(e) => { onChange(e); adjustHeight(); }} onBlur={onBlur} placeholder={placeholder} rows={rows} style={style} />;
         };
 
+        // Settings Modal (省略)
         function SettingsModal({ isOpen, onClose, initialError }) {
              const [mode, setMode] = useState('simple'); 
              const [apiKey, setApiKey] = useState('');
@@ -497,7 +537,7 @@
                                         ))}
                                         
                                         <div 
-                                            className={`aspect-video w-full bg-white border-2 border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center text-slate-300 overflow-hidden relative cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/10 transition-all group/add print:hidden ${images.length === 0 ? 'min-h-[120px]' : ''}`}
+                                            className={`aspect-video w-full bg-white border-2 border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center text-slate-300 overflow-hidden relative cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/10 transition-all group/add print:hidden`}
                                             onClick={() => fileInputRefs.current[index]?.click()}
                                             tabIndex={-1} 
                                         >
@@ -709,13 +749,17 @@
             );
         }
 
-        // Main App Component (省略 - 前と同じ)
+        // Main App Component
         function StoryboardApp() {
             const [activeTab, setActiveTab] = useState('patternA');
             const [user, setUser] = useState(null);
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             const [syncError, setSyncError] = useState(null);
+            const [isLoading, setIsLoading] = useState(true); // ローディング状態を追加
+            
             const projectId = getProjectIdFromUrl();
+            
+            // Initial load from local storage
             const [history, setHistory] = useState(() => {
                 const saved = localStorage.getItem(`storyboard_data_${projectId}`);
                 // 初期データにインタビューがない場合のフォールバック
@@ -726,19 +770,48 @@
             const [historyIndex, setHistoryIndex] = useState(0);
             const currentData = history[historyIndex];
 
+            // Setup Auth & Sync
             useEffect(() => {
-                if (!auth) { if (globalInitError) setSyncError("設定エラー: " + globalInitError); return; }
-                const initAuth = async () => { try { await signInAnonymously(auth); setSyncError(null); } catch (e) { console.error("Auth error", e); setSyncError("認証エラー: 匿名認証が無効です。"); } };
+                // Firebase未設定またはエラー時はローディング終了
+                if (!auth) {
+                    if (globalInitError) setSyncError("設定エラー: " + globalInitError);
+                    setIsLoading(false);
+                    return;
+                }
+
+                const initAuth = async () => {
+                    try { 
+                        await signInAnonymously(auth); 
+                        setSyncError(null);
+                    } catch (e) { 
+                        console.error("Auth error", e);
+                        setSyncError("認証エラー: 匿名認証が無効です。");
+                        setIsLoading(false);
+                    }
+                };
                 initAuth();
-                return onAuthStateChanged(auth, (u) => { setUser(u); });
+                
+                return onAuthStateChanged(auth, (u) => {
+                    setUser(u);
+                    if (u) {
+                        // ログイン成功時にローディングを継続（Firestore同期待ち）
+                    } else if (!globalInitError) {
+                        // ログアウト時などはローディング終了
+                         setIsLoading(false);
+                    }
+                });
             }, []);
 
+            // Firestore Sync (Listen)
             useEffect(() => {
                 if (!user || !db) return;
                 const docRef = doc(collection(db, 'projects'), projectId);
+                
                 const unsubscribe = onSnapshot(docRef, (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
+                        // ここで手元のデータと比較するロジックは複雑になるためシンプルに
+                        // クラウドからデータが来たら、それを正として表示する（ただし初回はチラつく可能性がある）
                         setHistory(prev => {
                             const current = prev[prev.length - 1];
                             if (JSON.stringify(current) === JSON.stringify(data)) return prev;
@@ -753,14 +826,45 @@
                             setHistoryIndex(newHist.length - 1);
                             return newHist;
                         });
-                    } else { saveToFirestore(initialProjectData); }
-                }, (error) => { console.log("Sync error:", error); setSyncError("同期エラー: " + error.code); });
+                    } else {
+                         // ★修正ポイント: クラウドにデータがない場合
+                         // ローカルストレージにデータがあればそれを優先してアップロード（復元）する
+                         const saved = localStorage.getItem(`storyboard_data_${projectId}`);
+                         if (saved) {
+                             console.log("Restoring from Local Storage to Cloud...");
+                             const localData = JSON.parse(saved);
+                             saveToFirestore(localData);
+                         } else if (isLoading) {
+                             // 本当に何もない場合は初期データを保存
+                             saveToFirestore(initialProjectData);
+                         }
+                    }
+                    setIsLoading(false); // データ取得完了または初期化完了
+                }, (error) => {
+                    console.log("Sync error:", error);
+                    setSyncError("同期エラー: " + error.code);
+                    setIsLoading(false); // エラー時もローディング終了
+                });
                 return () => unsubscribe();
             }, [user, projectId]); 
 
+            const checkDataSize = (data) => {
+                const jsonString = JSON.stringify(data);
+                return new TextEncoder().encode(jsonString).length;
+            };
+
             const saveData = async (newData) => {
                 localStorage.setItem(`storyboard_data_${projectId}`, JSON.stringify(newData));
-                if (user && db) { saveToFirestore(newData); }
+                if (user && db) {
+                    // データサイズチェック (1MB = 1,048,576 bytes)
+                    const size = checkDataSize(newData);
+                    if (size > 1000000) {
+                        alert("データ容量が大きすぎます(約1MB超)。これ以上画像を保存できません。\n古い画像を削除するか、画質を下げてください。");
+                        setSyncError("容量エラー: データが大きすぎます");
+                        return;
+                    }
+                    saveToFirestore(newData);
+                }
             };
             
             const saveToFirestore = async (newData) => {
@@ -811,6 +915,17 @@
             else if (firebaseConfig) { statusBadge = <span className="text-amber-500 flex items-center gap-1 font-bold"><Clock className="w-4 h-4 animate-pulse" /> 接続中...</span>; } 
             else { statusBadge = <span className="text-slate-400 flex items-center gap-1 font-bold"><HardDrive className="w-4 h-4" /> オフライン</span>; }
 
+            // ローディング画面
+            if (isLoading) {
+                return (
+                    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 text-slate-500">
+                        <Loader2 className="w-10 h-10 animate-spin mb-4 text-indigo-500" />
+                        <p className="text-lg font-bold">データを読み込み中...</p>
+                        <p className="text-sm mt-2">クラウド同期を確認しています</p>
+                    </div>
+                );
+            }
+
             return (
                 <div className="max-w-[1400px] mx-auto p-4 md:p-6 print:p-0 print:w-full">
                     <div className="mb-6 flex flex-col gap-4 print:hidden">
@@ -845,7 +960,7 @@
                     <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-x-auto print:shadow-none print:border-none print:w-full print:max-w-none print:rounded-none min-h-[800px]">
                         {activeTab.startsWith('pattern') ? (<StoryboardEditor data={currentData[activeTab]} common={currentData.common} onUpdate={(d) => updateTabData(activeTab, d)} />) : activeTab === 'interview' ? (<InterviewListEditor data={currentData.interview} onUpdate={(d) => updateTabData('interview', d)} />) : (<CallSheetEditor data={currentData.callSheet} common={currentData.common} onUpdate={(d) => updateTabData('callSheet', d)} />)}
                     </div>
-                    <div className="mt-8 text-center text-slate-400 text-sm print:hidden pb-12"><p>動画制作マネージャー v43.0 (Firebase Sync Enabled)</p></div>
+                    <div className="mt-8 text-center text-slate-400 text-sm print:hidden pb-12"><p>動画制作マネージャー v49.0 (Firebase Sync Enabled)</p></div>
                     <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} initialError={globalInitError || syncError} />
                 </div>
             );
