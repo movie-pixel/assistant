@@ -44,6 +44,7 @@
             }
             #root { zoom: 0.9; }
 
+            /* 印刷時に隠す要素 */
             .print\:hidden, 
             .no-print, 
             button:not(.print\:show) { 
@@ -96,7 +97,7 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { Printer, FileText, Edit3, Image as ImageIcon, Clock, PenTool, Video, PlayCircle, Undo, Redo, Calendar as CalendarIcon, Users, MapPin, Briefcase, ChevronDown, MonitorPlay, Wifi, WifiOff, HardDrive, Settings, X, Save, Trash2, AlertCircle, Code, List, HelpCircle, RefreshCw, Link as LinkIcon, Check, ExternalLink, Plus, XCircle, Mic, Upload, Loader2 } from 'lucide-react';
+        import { Printer, FileText, Edit3, Image as ImageIcon, Clock, PenTool, Video, PlayCircle, Undo, Redo, Calendar as CalendarIcon, Users, MapPin, Briefcase, ChevronDown, MonitorPlay, Wifi, WifiOff, HardDrive, Settings, X, Save, Trash2, AlertCircle, Code, List, HelpCircle, RefreshCw, Link as LinkIcon, Check, ExternalLink, Plus, XCircle, Mic, Upload, Loader2, Save as SaveIcon } from 'lucide-react';
         
         import { initializeApp, getApps } from "firebase/app";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
@@ -156,7 +157,7 @@
             return 'demo';
         };
 
-        const compressImage = (file, maxWidth = 300, quality = 0.5) => {
+        const compressImage = (file, maxWidth = 500, quality = 0.6) => {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
@@ -188,7 +189,6 @@
             return new TextEncoder().encode(jsonString).length;
         };
 
-        // --- Data Templates ---
         const migrateCutData = (cut) => {
             if (!cut.images && cut.image) {
                 return { ...cut, images: [cut.image] };
@@ -199,6 +199,7 @@
             return cut;
         };
 
+        // --- Data Templates ---
         const patternA_Data = {
             type: 'storyboard',
             header: { title: "『入院することになって…』(A案)", page: "1 / 1" },
@@ -222,7 +223,6 @@
             header: { title: "『保険料を下げたい…』(B案)", page: "1 / 1" },
             cuts: [
                 { id: "CUT1-1", title: "来店", camera: "固定（三脚）", visuals: "画①〈固定〉：店舗入口と店内全体\n画②〈固定〉：スタッフが立ち上がる", images: [], seconds: "", dialogue: [{ speaker: "お客様", text: "「初めてなんですが、相談できますか？」" }, { speaker: "スタッフ", text: "「いらっしゃいませ。今日はどうされましたか？」" }], notes: "", feedback: "" },
-                // 他のカットも同様に images: [] を追加または既存データをマイグレーション時に対応
             ]
         };
         const normalizeData = (data) => {
@@ -407,15 +407,12 @@
                     const newImages = [];
                     for (let i = 0; i < files.length; i++) {
                         try {
-                            // 圧縮率を強化
-                            const compressed = await compressImage(files[i], 300, 0.5);
+                            const compressed = await compressImage(files[i], 300, 0.5); // 圧縮率強化
                             newImages.push(compressed);
                         } catch (err) { console.error("Image compression failed", err); }
                     }
                     const currentCuts = [...data.cuts];
                     const currentImages = currentCuts[index].images || [];
-                    
-                    // 枚数制限を撤廃（容量エラーは後段で検知）
                     const updatedImages = [...currentImages, ...newImages];
                     
                     currentCuts[index] = { ...currentCuts[index], images: updatedImages, image: null }; 
@@ -448,7 +445,7 @@
                         foundImage = true;
                         const blob = items[i].getAsFile();
                         try {
-                            const compressed = await compressImage(blob, 300, 0.5); // 強圧縮
+                            const compressed = await compressImage(blob, 300, 0.5); // 圧縮率強化
                             const currentCuts = [...data.cuts];
                             const currentImages = currentCuts[index].images || [];
                             const updatedImages = [...currentImages, compressed];
@@ -758,9 +755,12 @@
             const [user, setUser] = useState(null);
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             const [syncError, setSyncError] = useState(null);
-            const [isLoading, setIsLoading] = useState(true); // ローディング状態を追加
+            const [isLoading, setIsLoading] = useState(true); 
             
             const projectId = getProjectIdFromUrl();
+            
+            // Ref for holding current data to use in auto-save
+            const currentDataRef = useRef(initialProjectData);
             
             // Initial load from local storage
             const [history, setHistory] = useState(() => {
@@ -768,10 +768,28 @@
                 // 初期データにインタビューがない場合のフォールバック
                 let initial = saved ? JSON.parse(saved) : initialProjectData;
                 if (!initial.interview) initial.interview = initialProjectData.interview;
+                // Refも初期化
+                currentDataRef.current = initial;
                 return [initial];
             });
             const [historyIndex, setHistoryIndex] = useState(0);
             const currentData = history[historyIndex];
+
+            // Update ref when data changes
+            useEffect(() => {
+                currentDataRef.current = currentData;
+            }, [currentData]);
+
+            // Auto Save (30 seconds)
+            useEffect(() => {
+                const timer = setInterval(() => {
+                    if (currentDataRef.current) {
+                        console.log("Auto-saving data...");
+                        saveData(currentDataRef.current);
+                    }
+                }, 30000);
+                return () => clearInterval(timer);
+            }, [user, db, projectId]); // user, db, projectIdが変わったらタイマー再設定
 
             // Setup Auth & Sync
             useEffect(() => {
@@ -814,10 +832,10 @@
                     if (docSnap.exists()) {
                         const data = docSnap.data();
                         
-                        // 【復旧ロジック】
-                        // クラウドのデータが「デモデータ」と一致していて、
-                        // ローカルに「編集済みデータ」がある場合、
-                        // クラウドのデータをローカルのデータで上書きする（復旧）
+                        // 【復旧ロジック・強化版】
+                        // 手元（ローカル）に編集済みのデータがあるのに、
+                        // クラウドから「デモデータ（初期値）」が送られてきた場合は、
+                        // クラウドのデータを無視して、手元のデータをクラウドに強制上書き（復旧）する。
                         const savedLocal = localStorage.getItem(`storyboard_data_${projectId}`);
                         let localData = savedLocal ? JSON.parse(savedLocal) : null;
                         
@@ -826,14 +844,16 @@
                         const isLocalEdited = localData && localData.common?.clientName !== "株式会社〇〇";
 
                         if (isCloudDemo && isLocalEdited) {
-                            console.log("Restoring Cloud data from Local (Cloud was demo)...");
-                            saveToFirestore(localData); // 復旧実行
-                            return; // 状態更新せずリターン
+                            console.log("⚠️ Cloud data is demo but Local is edited. Force restoring Cloud from Local...");
+                            saveToFirestore(localData); // 復旧実行（クラウドを上書き）
+                            return; // 状態更新せず、次のスナップショット（上書き後）を待つ
                         }
 
                         setHistory(prev => {
                             const current = prev[prev.length - 1];
+                            // 内容が同じなら更新しない（ループ防止）
                             if (JSON.stringify(current) === JSON.stringify(data)) return prev;
+                            
                             const migratedData = { 
                                 ...data, 
                                 patternA: normalizeData(data.patternA), 
@@ -846,10 +866,11 @@
                             return newHist;
                         });
                     } else {
-                         // クラウドにデータがない場合もローカルから復元
+                         // ★修正ポイント: クラウドにデータがない場合
+                         // ローカルストレージにデータがあればそれを優先してアップロード（復元）する
                          const saved = localStorage.getItem(`storyboard_data_${projectId}`);
                          if (saved) {
-                             console.log("Restoring from Local Storage to Cloud (Cloud empty)...");
+                             console.log("Cloud empty. Restoring from Local Storage...");
                              saveToFirestore(JSON.parse(saved));
                          } else if (isLoading) {
                              // 本当に何もない場合は初期データを保存
@@ -871,7 +892,9 @@
             };
 
             const saveData = async (newData) => {
+                // ローカル保存は常に行う
                 localStorage.setItem(`storyboard_data_${projectId}`, JSON.stringify(newData));
+                
                 if (user && db) {
                     // データサイズチェック (1MB = 1,048,576 bytes)
                     const size = checkDataSize(newData);
@@ -925,6 +948,14 @@
                 const newId = prompt("新しい共有IDを入力してください:", projectId);
                 if (newId && newId !== projectId) { window.location.hash = newId; window.location.reload(); }
             };
+            
+            // 手動保存ハンドラ（強制上書き）
+            const handleManualSave = () => {
+                if(confirm("現在のデータをクラウドに強制保存（上書き）しますか？")) {
+                    saveData(currentData);
+                    alert("保存しました。");
+                }
+            };
 
             let statusBadge;
             if (globalInitError || syncError) { statusBadge = <span className="text-rose-500 flex items-center gap-1 cursor-pointer hover:underline font-bold" onClick={() => setIsSettingsOpen(true)}><AlertCircle className="w-4 h-4" /> 接続エラー (オフライン)</span>; } 
@@ -955,6 +986,7 @@
                                 <div className="flex bg-white rounded-lg border border-slate-200 p-1 shadow-sm"><button onClick={handleUndo} disabled={historyIndex === 0} className="p-2 rounded hover:bg-slate-100 disabled:opacity-30 text-slate-600"><Undo className="w-4 h-4" /></button><button onClick={handleRedo} disabled={historyIndex === history.length - 1} className="p-2 rounded hover:bg-slate-100 disabled:opacity-30 text-slate-600"><Redo className="w-4 h-4" /></button></div>
                                 <button onClick={handleCopyLink} className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-md transition-all"><LinkIcon className="w-4 h-4" /> 共有</button>
                                 <button onClick={() => window.print()} className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-md transition-all"><Printer className="w-4 h-4" /> 印刷 / PDF</button>
+                                <button onClick={handleManualSave} className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-orange-500 rounded-lg hover:bg-orange-600 shadow-md transition-all" title="クラウドに強制保存"><SaveIcon className="w-4 h-4" /> 保存</button>
                                 <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2 px-3 py-2 text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-slate-700 shadow-sm transition-all" title="設定"><Settings className="w-5 h-5" /></button>
                             </div>
                         </div>
@@ -977,7 +1009,7 @@
                     <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-x-auto print:shadow-none print:border-none print:w-full print:max-w-none print:rounded-none min-h-[800px]">
                         {activeTab.startsWith('pattern') ? (<StoryboardEditor data={currentData[activeTab]} common={currentData.common} onUpdate={(d) => updateTabData(activeTab, d)} />) : activeTab === 'interview' ? (<InterviewListEditor data={currentData.interview} onUpdate={(d) => updateTabData('interview', d)} />) : (<CallSheetEditor data={currentData.callSheet} common={currentData.common} onUpdate={(d) => updateTabData('callSheet', d)} />)}
                     </div>
-                    <div className="mt-8 text-center text-slate-400 text-sm print:hidden pb-12"><p>動画制作マネージャー v49.0 (Firebase Sync Enabled)</p></div>
+                    <div className="mt-8 text-center text-slate-400 text-sm print:hidden pb-12"><p>動画制作マネージャー v50.0 (Firebase Sync Enabled - Auto Recovery)</p></div>
                     <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} initialError={globalInitError || syncError} />
                 </div>
             );
