@@ -74,17 +74,23 @@
             textarea::placeholder { color: transparent; }
             input[type="date"] { border-bottom: none !important; }
 
-            .image-upload-area { display: none !important; }
+            /* 画像エリアの点線枠などを消す */
+            .image-upload-area {
+                display: none !important;
+            }
+            
             .print\:grid-cols-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
             .break-inside-avoid { page-break-inside: avoid; }
         }
         
+        /* Date Picker Customization */
         input[type="date"] { position: relative; }
         input[type="date"]::-webkit-calendar-picker-indicator {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             opacity: 0; cursor: pointer; padding: 0; margin: 0;
         }
         
+        /* Scrollbar */
         ::-webkit-scrollbar { height: 8px; width: 8px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -99,14 +105,17 @@
         import { createRoot } from 'react-dom/client';
         import { Printer, FileText, Edit3, Image as ImageIcon, Clock, PenTool, Video, PlayCircle, Undo, Redo, Calendar as CalendarIcon, Users, MapPin, Briefcase, ChevronDown, MonitorPlay, Wifi, WifiOff, HardDrive, Settings, X, Save, Trash2, AlertCircle, Code, List, HelpCircle, RefreshCw, Link as LinkIcon, Check, ExternalLink, Plus, XCircle, Mic, Upload, Loader2, Save as SaveIcon } from 'lucide-react';
         
+        // Firebase Imports
         import { initializeApp, getApps } from "firebase/app";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
         import { getFirestore, doc, setDoc, onSnapshot, collection } from "firebase/firestore";
 
+        // --- Firebase Initialization Logic ---
         let app, auth, db;
         const appId = 'storyboard-project-v1'; 
         let globalInitError = null;
 
+        // デフォルト設定
         const defaultFirebaseConfig = {
             apiKey: "AIzaSyDnJf6vHEpdkjhjtnkLxzJaT4EGJgAw1lI",
             authDomain: "ekonte-a4b51.firebaseapp.com",
@@ -116,6 +125,7 @@
             appId: "1:402726001930:web:65f70eb92369726c5ceef3"
         };
 
+        // 1. 設定の決定 
         const savedConfigStr = localStorage.getItem('firebase_config');
         let firebaseConfig = defaultFirebaseConfig; 
 
@@ -132,6 +142,7 @@
             }
         }
 
+        // 2. Initialize Firebase
         if (firebaseConfig) {
             try {
                 if (!getApps().length) {
@@ -140,6 +151,7 @@
                     app = getApps()[0];
                 }
                 auth = getAuth(app);
+                // Firestore初期化時に設定を追加
                 db = getFirestore(app);
                 console.log("Firebase initialized successfully with:", firebaseConfig.projectId);
             } catch (e) {
@@ -149,6 +161,7 @@
             }
         }
 
+        // URLパラメータまたはハッシュからプロジェクトIDを取得
         const getProjectIdFromUrl = () => {
             const hash = window.location.hash.substring(1); 
             if (hash) return decodeURIComponent(hash);
@@ -157,6 +170,7 @@
             return 'demo';
         };
 
+        // 画像圧縮関数 (設定を軽量化: 幅500px, 画質0.6)
         const compressImage = (file, maxWidth = 500, quality = 0.6) => {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -168,10 +182,12 @@
                         const canvas = document.createElement('canvas');
                         let width = img.width;
                         let height = img.height;
+
                         if (width > maxWidth) {
                             height = Math.round((height * maxWidth) / width);
                             width = maxWidth;
                         }
+
                         canvas.width = width;
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
@@ -184,11 +200,13 @@
             });
         };
         
+        // データサイズチェック関数 (UTF-8バイト数概算)
         const checkDataSize = (data) => {
             const jsonString = JSON.stringify(data);
             return new TextEncoder().encode(jsonString).length;
         };
 
+        // --- Data Templates ---
         const migrateCutData = (cut) => {
             if (!cut.images && cut.image) {
                 return { ...cut, images: [cut.image] };
@@ -199,7 +217,6 @@
             return cut;
         };
 
-        // --- Data Templates ---
         const patternA_Data = {
             type: 'storyboard',
             header: { title: "『入院することになって…』(A案)", page: "1 / 1" },
@@ -223,6 +240,7 @@
             header: { title: "『保険料を下げたい…』(B案)", page: "1 / 1" },
             cuts: [
                 { id: "CUT1-1", title: "来店", camera: "固定（三脚）", visuals: "画①〈固定〉：店舗入口と店内全体\n画②〈固定〉：スタッフが立ち上がる", images: [], seconds: "", dialogue: [{ speaker: "お客様", text: "「初めてなんですが、相談できますか？」" }, { speaker: "スタッフ", text: "「いらっしゃいませ。今日はどうされましたか？」" }], notes: "", feedback: "" },
+                // 他のカットも同様に images: [] を追加または既存データをマイグレーション時に対応
             ]
         };
         const normalizeData = (data) => {
@@ -270,8 +288,17 @@
                         }
                     ]
                 },
-                // ... 他のインタビューデータ ...
-                { category: "キャリアアップを知りたい", items: [{ title: "インタビュー③｜入社後研修・キャリアアップ", qa: [{ q: "Q1. 入社後はどんな研修から始まりますか？", a: "【回答例】\n\n基礎知識から学べる研修からスタートします。" }, { q: "Q2. 未経験でも本当に大丈夫でしたか？", a: "【回答例】\n\n私自身も未経験でしたが、問題ありませんでした。" }, { q: "Q3. 研修ではどんなことを学びますか？", a: "【回答例】\n\n知識だけでなく、お客様との向き合い方も学びます。" }, { q: "Q4. 成長や評価はどのように決まりますか？", a: "【回答例】\n\nできることが増えると、評価や昇給につながります。" }, { q: "Q5. 将来のキャリアにはどんな選択肢がありますか？", a: "【回答例】\n\nリーダーや育成側に進む道もあります。" }] }] },
+                {
+                    category: "キャリアアップを知りたい",
+                    items: [
+                        {
+                            title: "インタビュー③｜入社後研修・キャリアアップ",
+                            qa: [
+                                { q: "Q1. 入社後はどんな研修から始まりますか？", a: "【回答例】\n\n基礎知識から学べる研修からスタートします。" },
+                                { q: "Q2. 未経験でも本当に大丈夫でしたか？", a: "【回答例】\n\n私自身も未経験でしたが、問題ありませんでした。" },
+                                { q: "Q3. 研修ではどんなことを学びますか？", a: "【回答例】\n\n知識だけでなく、お客様との向き合い方も学びます。" },
+                                { q: "Q4. 成長や評価はどのように決まりますか？", a: "【回答例】\n\nできることが増えると、評価や昇給につながります。" },
+                                { q: "Q5. 将来のキャリアにはどんな選択肢がありますか？", a: "【回答例】\n\nリーダーや育成側に進む道もあります。" }] }] },
                 { category: "社員を知りたい", items: [{ title: "インタビュー④｜社員A（育休・復帰）", qa: [{ q: "Q1. 今はどんな働き方をしていますか？", a: "【回答例】\n\n現在は時短勤務で働いています。" }, { q: "Q2. 育休前に不安だったことは何ですか？", a: "【回答例】\n\n仕事と育児の両立が一番不安でした。" }, { q: "Q3. 実際に復帰してみてどうでしたか？", a: "【回答例】\n\n周囲のサポートがあって、安心して復帰できました。" }, { q: "Q4. 働き続けられている理由は何ですか？", a: "【回答例】\n\n自分の状況に合わせて働ける環境があるからです。" }, { q: "Q5. 同じ立場の方に伝えたいことは？", a: "【回答例】\n\n無理せず続けられる職場だと思います。" }] }, { title: "インタビュー⑤｜社員B（新卒→リーダー）", qa: [{ q: "Q1. 新卒でこの会社を選んだ理由は？", a: "【回答例】\n\n人と長く関われる仕事だと思ったからです。" }, { q: "Q2. 入社当初、不安だったことはありますか？", a: "【回答例】\n\n知識面の不安はありました。" }, { q: "Q3. 成長を実感したタイミングは？", a: "【回答例】\n\n一人でお客様対応ができるようになった時です。" }, { q: "Q4. リーダーになって変わったことは？", a: "【回答例】\n\n周りを見て動く意識が強くなりました。" }, { q: "Q5. これから入社する方へ一言お願いします。", a: "【回答例】\n\n未経験でも安心して挑戦してほしいです。" }] }, { title: "インタビュー⑥｜社員C（保険会社から転職）", qa: [{ q: "Q1. 前職ではどんな仕事をしていましたか？", a: "【回答例】\n\n保険会社で営業の仕事をしていました。" }, { q: "Q2. 転職を考えたきっかけは？", a: "【回答例】\n\nもっとお客様に寄り添いたいと思ったからです。" }, { q: "Q3. 今の仕事で一番違うと感じる点は？", a: "【回答例】\n\n売るより、相談に乗る時間が長いところです。" }, { q: "Q4. やりがいはどう変わりましたか？", a: "【回答例】\n\n感謝の言葉を直接いただけるようになりました。" }, { q: "Q5. 転職を迷っている方へ一言。", a: "【回答例】\n\n保険の仕事の見方が変わると思います。" }] }] },
                 { category: "会社を知りたい", items: [{ title: "インタビュー⑦｜会社概要", qa: [{ q: "Q1. どんな会社ですか？", a: "【回答例】\n\n保険のサービスショップを運営している会社です。" }, { q: "Q2. いつ創業した会社ですか？", a: "【回答例】\n\n1998年に創業しました。" }, { q: "Q3. 他社との違いは何ですか？", a: "【回答例】\n\n売ることより、支えることを大切にしています。" }] }, { title: "インタビュー⑧｜事業内容", qa: [{ q: "Q1. どんなサービスを提供していますか？", a: "【回答例】\n\n相談や給付手続き、見直しなどを行っています。" }, { q: "Q2. お客様とはどんな関係性ですか？", a: "【回答例】\n\n長く付き合っていく関係です。" }, { q: "Q3. 仕事の特徴を教えてください？", a: "【回答例】\n\n困った時に頼ってもらえる仕事です。" }] }, { title: "インタビュー⑨｜創業のはなし", qa: [{ q: "Q1. 創業のきっかけは何だったのですか？", a: "【回答例】\n\n保険で困った時に相談できる場所を作りたかったからです。" }, { q: "Q2. 当時、大変だったことは？", a: "【回答例】\n\n前例がなく、すべて手探りでした。" }, { q: "Q3. 今につながっている想いは？", a: "【回答例】\n\nお客様第一という考え方です。" }] }, { title: "インタビュー⑩｜目指していること", qa: [{ q: "Q1. 今後どんな会社を目指していますか？", a: "【回答例】\n\nかかりつけの保険サービスを広げていきたいです。" }, { q: "Q2. 社員にはどんな働き方をしてほしいですか？", a: "【回答例】\n\n誇りを持って働いてほしいです。" }] }, { title: "インタビュー⑪｜募集要項（まとめ）", qa: [{ q: "Q1. 今回募集している職種を教えてください。", a: "【回答例】\n\n保険サービススタッフです。" }, { q: "Q2. どんな方に向いていますか？", a: "【回答例】\n\n人の話を聞くのが好きな方です。" }, { q: "Q3. 未経験でも応募できますか？", a: "【回答例】\n\n研修があるので問題ありません。" }, { q: "Q4. 応募を迷っている方へ一言。", a: "【回答例】\n\nまずは気軽に話を聞きに来てほしいです。" }] }] }
             ]
@@ -399,6 +426,24 @@
                 newCuts[cutIndex] = { ...newCuts[cutIndex], dialogue: newDialogue };
                 onUpdate({ ...data, cuts: newCuts });
             };
+            
+            const handleDialogueAdd = (cutIndex) => {
+                const newCuts = [...data.cuts];
+                newCuts[cutIndex].dialogue.push({ speaker: "", text: "" });
+                onUpdate({ ...data, cuts: newCuts });
+            };
+            
+            const handleDialogueDelete = (cutIndex, dIndex) => {
+                 const newCuts = [...data.cuts];
+                 newCuts[cutIndex].dialogue.splice(dIndex, 1);
+                 onUpdate({ ...data, cuts: newCuts });
+            };
+            
+            const handleShotCheck = (index, value) => {
+                const newCuts = [...data.cuts];
+                newCuts[index] = { ...newCuts[index], isShotCompleted: value };
+                onUpdate({ ...data, cuts: newCuts });
+            };
 
             // 複数画像追加 (圧縮処理付き)
             const handleImageAdd = async (index, e) => {
@@ -457,6 +502,12 @@
                 }
                 if (foundImage) { e.preventDefault(); e.stopPropagation(); }
             };
+            
+            const handleFeedbackCheck = (index, value) => {
+                const newCuts = [...data.cuts];
+                newCuts[index] = { ...newCuts[index], feedbackCompleted: value };
+                onUpdate({ ...data, cuts: newCuts });
+            };
 
             const calculateEstimatedTime = (dialogue) => {
                 const totalChars = dialogue.reduce((acc, line) => acc + line.text.replace(/[\s\u3000「」]/g, '').length, 0);
@@ -502,9 +553,13 @@
                         const images = cut.images || (cut.image ? [cut.image] : []);
 
                         return (
-                            <div key={cut.id} className="grid grid-cols-[60px_3fr_3fr_3fr_80px_2fr] border-b border-slate-100 last:border-none hover:bg-slate-50/50 transition-colors group break-inside-avoid print:border-slate-300">
+                            <div key={cut.id} className={`grid grid-cols-[60px_3fr_3fr_3fr_80px_2fr] border-b border-slate-100 last:border-none hover:bg-slate-50/50 transition-colors group break-inside-avoid print:border-slate-300 ${cut.isShotCompleted ? 'bg-emerald-50/50 print:bg-white' : ''}`}>
                                 <div className="p-4 border-r border-slate-100 flex flex-col items-center justify-center bg-slate-50/30 print:bg-white print:border-slate-400">
                                     <span className="text-xl font-bold text-slate-800 font-mono tracking-tighter">{cut.id}</span>
+                                    <label className="mt-2 flex flex-col items-center cursor-pointer no-print">
+                                        <input type="checkbox" className="w-5 h-5 accent-emerald-600 rounded cursor-pointer" checked={!!cut.isShotCompleted} onChange={(e) => handleShotCheck(index, e.target.checked)} />
+                                        <span className="text-[10px] font-bold text-emerald-600 mt-0.5">撮影済</span>
+                                    </label>
                                 </div>
                                 
                                 <div 
@@ -576,11 +631,15 @@
                                 <div className="p-4 border-r border-slate-100 flex flex-col justify-center print:border-slate-400">
                                     <div className="space-y-4">
                                         {cut.dialogue.map((line, dIndex) => (
-                                            <div key={dIndex} className="flex flex-col gap-1 border-l-4 border-slate-200 pl-3 hover:border-indigo-300 transition-colors print:border-none print:pl-0">
-                                                <input className="text-sm font-bold text-slate-700 bg-transparent border-none focus:ring-0 p-0 mb-0.5" value={line.speaker} onChange={(e) => handleDialogueUpdate(index, dIndex, 'speaker', e.target.value)} onBlur={() => {}} placeholder="話者" />
+                                            <div key={dIndex} className="flex flex-col gap-1 border-l-4 border-slate-200 pl-3 hover:border-indigo-300 transition-colors print:border-none print:pl-0 group/line relative">
+                                                <div className="flex justify-between items-start">
+                                                    <input className="text-sm font-bold text-slate-700 bg-transparent border-none focus:ring-0 p-0 mb-0.5 w-full" value={line.speaker} onChange={(e) => handleDialogueUpdate(index, dIndex, 'speaker', e.target.value)} onBlur={() => {}} placeholder="話者" />
+                                                    <button onClick={() => handleDialogueDelete(index, dIndex)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover/line:opacity-100 transition-opacity print:hidden"><X size={12} /></button>
+                                                </div>
                                                 <AutoResizeTextarea className="w-full text-base font-medium text-slate-800 bg-white border border-slate-200 rounded p-2 pb-3 focus:ring-2 focus:ring-indigo-100 leading-relaxed whitespace-pre-wrap break-words" value={line.text} onChange={(e) => handleDialogueUpdate(index, dIndex, 'text', e.target.value)} onBlur={() => {}} rows={6} placeholder="セリフ" />
                                             </div>
                                         ))}
+                                        <button onClick={() => handleDialogueAdd(index)} className="w-full py-1 border-2 border-dashed border-slate-200 rounded text-slate-400 hover:text-blue-500 hover:border-blue-300 hover:bg-blue-50 transition-all text-xs font-bold print:hidden flex items-center justify-center gap-1"><Plus size={12} /> セリフ追加</button>
                                     </div>
                                 </div>
                                 <div className="p-2 border-r border-slate-100 flex flex-col items-center justify-center bg-slate-50/30 print:bg-white print:border-slate-400">
@@ -605,8 +664,14 @@
                                         <AutoResizeTextarea className="w-full text-sm text-slate-700 bg-white border border-slate-200 rounded p-2 focus:bg-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-200 transition-all print:border-none print:p-0 whitespace-pre-wrap break-words" value={cut.notes} onChange={(e) => handleCutUpdate(index, 'notes', e.target.value)} onBlur={() => {}} rows={3} />
                                     </div>
                                     <div className="flex-1">
-                                        <label className="text-[9px] font-bold text-rose-600 uppercase tracking-wider mb-2 block flex items-center gap-1"><PenTool className="w-3 h-3" />赤字修正</label>
-                                        <AutoResizeTextarea className="w-full text-sm text-rose-700 font-medium bg-rose-50 border border-rose-200 rounded p-2 focus:bg-white focus:border-rose-400 focus:ring-1 focus:ring-rose-200 transition-all placeholder-rose-300 print:bg-transparent print:border-none print:p-0 whitespace-pre-wrap break-words" value={cut.feedback} onChange={(e) => handleCutUpdate(index, 'feedback', e.target.value)} onBlur={() => {}} rows={3} />
+                                        <div className="flex justify-between items-center mb-2">
+                                            <label className="text-[9px] font-bold text-rose-600 uppercase tracking-wider block flex items-center gap-1"><PenTool className="w-3 h-3" />赤字修正</label>
+                                            <label className="flex items-center gap-1 cursor-pointer print:hidden">
+                                                <input type="checkbox" checked={!!cut.feedbackCompleted} onChange={(e) => handleFeedbackCheck(index, e.target.checked)} className="w-3 h-3 text-rose-600 rounded focus:ring-rose-500" />
+                                                <span className={`text-[9px] font-bold ${cut.feedbackCompleted ? 'text-rose-600' : 'text-slate-400'}`}>修正完了</span>
+                                            </label>
+                                        </div>
+                                        <AutoResizeTextarea className={`w-full text-sm font-medium bg-rose-50 border border-rose-200 rounded p-2 focus:bg-white focus:border-rose-400 focus:ring-1 focus:ring-rose-200 transition-all placeholder-rose-300 print:bg-transparent print:border-none print:p-0 whitespace-pre-wrap break-words ${cut.feedbackCompleted ? 'text-slate-400 line-through' : 'text-rose-700'}`} value={cut.feedback} onChange={(e) => handleCutUpdate(index, 'feedback', e.target.value)} onBlur={() => {}} rows={3} />
                                     </div>
                                 </div>
                             </div>
@@ -635,6 +700,22 @@
                 const newQA = [...newSections[secIdx].items[itemIdx].qa];
                 newQA[qaIdx] = { ...newQA[qaIdx], [field]: value };
                 newSections[secIdx].items[itemIdx].qa = newQA;
+                onUpdate({ ...data, sections: newSections });
+            };
+
+            const handleAddQA = (secIdx, itemIdx) => {
+                const newSections = [...(data.sections || [])];
+                const currentQA = newSections[secIdx].items[itemIdx].qa || [];
+                newSections[secIdx].items[itemIdx].qa = [...currentQA, { q: "", a: "", checked: false }];
+                onUpdate({ ...data, sections: newSections });
+            };
+
+             const handleDeleteQA = (secIdx, itemIdx, qaIdx) => {
+                if(!confirm("この項目を削除しますか？")) return;
+                const newSections = [...(data.sections || [])];
+                const currentQA = [...newSections[secIdx].items[itemIdx].qa];
+                currentQA.splice(qaIdx, 1);
+                newSections[secIdx].items[itemIdx].qa = currentQA;
                 onUpdate({ ...data, sections: newSections });
             };
 
@@ -668,7 +749,17 @@
                                             />
                                             <div className="space-y-4">
                                                 {item.qa.map((qa, qaIdx) => (
-                                                    <div key={qaIdx} className="group">
+                                                    <div key={qaIdx} className="group relative border-b border-slate-200 pb-4 last:border-0 last:pb-0">
+                                                        <div className="flex justify-between items-center mb-2">
+                                                            <div className="flex-1"></div>
+                                                            <button 
+                                                                onClick={() => handleDeleteQA(secIdx, itemIdx, qaIdx)}
+                                                                className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity print:hidden"
+                                                                title="削除"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
                                                         <div className="mb-2">
                                                             <AutoResizeTextarea 
                                                                 className="w-full text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded p-2 focus:ring-2 focus:ring-indigo-100"
@@ -687,6 +778,12 @@
                                                         </div>
                                                     </div>
                                                 ))}
+                                                <button 
+                                                    onClick={() => handleAddQA(secIdx, itemIdx)}
+                                                    className="w-full py-2 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 hover:text-blue-500 hover:border-blue-300 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 text-sm font-bold mt-4 print:hidden"
+                                                >
+                                                    <Plus className="w-4 h-4" /> セリフを追加
+                                                </button>
                                             </div>
                                         </div>
                                     ))}
@@ -706,6 +803,12 @@
                 newRows[index] = { ...newRows[index], [field]: value };
                 onUpdate({ ...data, rows: newRows });
             };
+            
+            const handleRowCheck = (index, value) => {
+                const newRows = [...data.rows];
+                newRows[index] = { ...newRows[index], isCompleted: value };
+                onUpdate({ ...data, rows: newRows });
+            };
 
             return (
                 <div className="bg-white min-h-[800px] min-w-[900px] print:min-w-0 print:w-full">
@@ -723,7 +826,8 @@
                         </div>
                     </div>
                     <div className="w-full">
-                        <div className="grid grid-cols-[150px_1fr_1.5fr_2fr_1.5fr_1.5fr] bg-slate-800 text-white text-[12px] font-bold uppercase tracking-widest">
+                        <div className="grid grid-cols-[40px_150px_1fr_1.5fr_2fr_1.5fr_1.5fr] bg-slate-800 text-white text-[12px] font-bold uppercase tracking-widest">
+                            <div className="p-3 text-center border-r border-slate-700 no-print">済</div>
                             <div className="p-3 text-center border-r border-slate-700">時間 (00:00～00:00)</div>
                             <div className="p-3 text-center border-r border-slate-700">シーン</div>
                             <div className="p-3 text-center border-r border-slate-700">場所 / セット</div>
@@ -732,7 +836,10 @@
                             <div className="p-3 text-center">備考</div>
                         </div>
                         {data.rows.map((row, index) => (
-                            <div key={index} className="grid grid-cols-[150px_1fr_1.5fr_2fr_1.5fr_1.5fr] border-b border-slate-200 hover:bg-emerald-50/30 transition-colors group break-inside-avoid">
+                            <div key={index} className={`grid grid-cols-[40px_150px_1fr_1.5fr_2fr_1.5fr_1.5fr] border-b border-slate-200 hover:bg-emerald-50/30 transition-colors group break-inside-avoid ${row.isCompleted ? 'bg-slate-100 opacity-60' : ''}`}>
+                                <div className="p-2 border-r border-slate-200 flex items-center justify-center no-print">
+                                    <input type="checkbox" className="w-4 h-4 text-emerald-600 rounded cursor-pointer" checked={!!row.isCompleted} onChange={(e) => handleRowCheck(index, e.target.checked)} />
+                                </div>
                                 <div className="p-2 border-r border-slate-200"><input className="w-full text-center font-bold text-base bg-transparent border-none focus:ring-0 p-1" value={row.time} onChange={(e) => handleRowChange(index, 'time', e.target.value)} placeholder="00:00～00:00" /></div>
                                 <div className="p-2 border-r border-slate-200 flex items-center justify-center"><input className="w-full text-center font-bold text-slate-800 bg-transparent border-none focus:ring-0 p-1" value={row.scene} onChange={(e) => handleRowChange(index, 'scene', e.target.value)} /></div>
                                 <div className="p-2 border-r border-slate-200 flex items-center"><AutoResizeTextarea className="w-full text-base bg-transparent border-none focus:ring-0 resize-none text-center break-words" value={row.location} onChange={(e) => handleRowChange(index, 'location', e.target.value)} onBlur={() => {}} /></div>
@@ -768,8 +875,6 @@
                 // 初期データにインタビューがない場合のフォールバック
                 let initial = saved ? JSON.parse(saved) : initialProjectData;
                 if (!initial.interview) initial.interview = initialProjectData.interview;
-                // Refも初期化
-                currentDataRef.current = initial;
                 return [initial];
             });
             const [historyIndex, setHistoryIndex] = useState(0);
@@ -789,7 +894,7 @@
                     }
                 }, 30000);
                 return () => clearInterval(timer);
-            }, [user, db, projectId]); // user, db, projectIdが変わったらタイマー再設定
+            }, [user, db, projectId]); 
 
             // Setup Auth & Sync
             useEffect(() => {
@@ -815,9 +920,8 @@
                 return onAuthStateChanged(auth, (u) => {
                     setUser(u);
                     if (u) {
-                        // ログイン成功時にローディングを継続（Firestore同期待ち）
+                        // ログイン成功時にローディングを継続
                     } else if (!globalInitError) {
-                        // ログアウト時などはローディング終了
                          setIsLoading(false);
                     }
                 });
@@ -833,27 +937,21 @@
                         const data = docSnap.data();
                         
                         // 【復旧ロジック・強化版】
-                        // 手元（ローカル）に編集済みのデータがあるのに、
-                        // クラウドから「デモデータ（初期値）」が送られてきた場合は、
-                        // クラウドのデータを無視して、手元のデータをクラウドに強制上書き（復旧）する。
                         const savedLocal = localStorage.getItem(`storyboard_data_${projectId}`);
                         let localData = savedLocal ? JSON.parse(savedLocal) : null;
                         
-                        // 簡易判定: クライアント名が初期値ならデモとみなす
                         const isCloudDemo = data.common?.clientName === "株式会社〇〇";
                         const isLocalEdited = localData && localData.common?.clientName !== "株式会社〇〇";
 
                         if (isCloudDemo && isLocalEdited) {
                             console.log("⚠️ Cloud data is demo but Local is edited. Force restoring Cloud from Local...");
-                            saveToFirestore(localData); // 復旧実行（クラウドを上書き）
-                            return; // 状態更新せず、次のスナップショット（上書き後）を待つ
+                            saveToFirestore(localData); 
+                            return; 
                         }
 
                         setHistory(prev => {
                             const current = prev[prev.length - 1];
-                            // 内容が同じなら更新しない（ループ防止）
                             if (JSON.stringify(current) === JSON.stringify(data)) return prev;
-                            
                             const migratedData = { 
                                 ...data, 
                                 patternA: normalizeData(data.patternA), 
@@ -866,22 +964,19 @@
                             return newHist;
                         });
                     } else {
-                         // ★修正ポイント: クラウドにデータがない場合
-                         // ローカルストレージにデータがあればそれを優先してアップロード（復元）する
                          const saved = localStorage.getItem(`storyboard_data_${projectId}`);
                          if (saved) {
                              console.log("Cloud empty. Restoring from Local Storage...");
                              saveToFirestore(JSON.parse(saved));
                          } else if (isLoading) {
-                             // 本当に何もない場合は初期データを保存
                              saveToFirestore(initialProjectData);
                          }
                     }
-                    setIsLoading(false); // データ取得完了または初期化完了
+                    setIsLoading(false); 
                 }, (error) => {
                     console.log("Sync error:", error);
                     setSyncError("同期エラー: " + error.code);
-                    setIsLoading(false); // エラー時もローディング終了
+                    setIsLoading(false); 
                 });
                 return () => unsubscribe();
             }, [user, projectId]); 
@@ -892,11 +987,8 @@
             };
 
             const saveData = async (newData) => {
-                // ローカル保存は常に行う
                 localStorage.setItem(`storyboard_data_${projectId}`, JSON.stringify(newData));
-                
                 if (user && db) {
-                    // データサイズチェック (1MB = 1,048,576 bytes)
                     const size = checkDataSize(newData);
                     if (size > 1000000) {
                         alert("データ容量が大きすぎます(約1MB超)。これ以上画像を保存できません。\n古い画像を削除するか、画質を下げてください。");
@@ -949,7 +1041,6 @@
                 if (newId && newId !== projectId) { window.location.hash = newId; window.location.reload(); }
             };
             
-            // 手動保存ハンドラ（強制上書き）
             const handleManualSave = () => {
                 if(confirm("現在のデータをクラウドに強制保存（上書き）しますか？")) {
                     saveData(currentData);
@@ -963,7 +1054,6 @@
             else if (firebaseConfig) { statusBadge = <span className="text-amber-500 flex items-center gap-1 font-bold"><Clock className="w-4 h-4 animate-pulse" /> 接続中...</span>; } 
             else { statusBadge = <span className="text-slate-400 flex items-center gap-1 font-bold"><HardDrive className="w-4 h-4" /> オフライン</span>; }
 
-            // ローディング画面
             if (isLoading) {
                 return (
                     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 text-slate-500">
@@ -1009,7 +1099,7 @@
                     <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-x-auto print:shadow-none print:border-none print:w-full print:max-w-none print:rounded-none min-h-[800px]">
                         {activeTab.startsWith('pattern') ? (<StoryboardEditor data={currentData[activeTab]} common={currentData.common} onUpdate={(d) => updateTabData(activeTab, d)} />) : activeTab === 'interview' ? (<InterviewListEditor data={currentData.interview} onUpdate={(d) => updateTabData('interview', d)} />) : (<CallSheetEditor data={currentData.callSheet} common={currentData.common} onUpdate={(d) => updateTabData('callSheet', d)} />)}
                     </div>
-                    <div className="mt-8 text-center text-slate-400 text-sm print:hidden pb-12"><p>動画制作マネージャー v50.0 (Firebase Sync Enabled - Auto Recovery)</p></div>
+                    <div className="mt-8 text-center text-slate-400 text-sm print:hidden pb-12"><p>動画制作マネージャー v52.0 (Firebase Sync Enabled - Auto Recovery)</p></div>
                     <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} initialError={globalInitError || syncError} />
                 </div>
             );
